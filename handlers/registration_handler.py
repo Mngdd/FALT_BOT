@@ -6,6 +6,7 @@ from aiogram.enums.content_type import ContentType
 from keyboards.keyboards import get_cancel_kb, get_admin_kb
 import tempfile, os
 from config import ADMIN_CHAT_ID
+from database.db import registration_clicked, add_registration_click
 
 
 reg_router = Router()
@@ -17,8 +18,11 @@ class Registration(StatesGroup):
 
 @reg_router.callback_query(F.data == "registration")
 async def start_registration(call : CallbackQuery, state : FSMContext):
-    await call.message.edit_caption(caption="Отправьте фотографию из своего личного кабинета МФТИ, на которой видно вашу фотографию, имя и фамилию", reply_markup=get_cancel_kb())
-    await state.set_state(Registration.photo)
+    if not registration_clicked(call.from_user.id):
+        await call.message.edit_caption(caption="Отправьте фотографию из своего личного кабинета МФТИ, на которой видно вашу фотографию, имя и фамилию", reply_markup=get_cancel_kb())
+        await state.set_state(Registration.photo)
+    else:
+        await call.message.edit_caption(caption="Ваша заявка на рассмотрении администратора")
     
 @reg_router.message(Registration.photo)
 async def ask_name(message: Message, state: FSMContext):
@@ -61,6 +65,7 @@ async def send_to_admin(message: Message, data: dict):
         caption=f'Пользователь: {data["name"]} {data["surname"]}',
         reply_markup=get_admin_kb(message.chat.id, data["name"], data["surname"])
     )
+    add_registration_click(message.from_user.id)
     try:
         os.remove(path)
     except:

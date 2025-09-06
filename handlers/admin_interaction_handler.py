@@ -6,6 +6,7 @@ from aiogram.enums.content_type import ContentType
 from keyboards.keyboards import get_start_kb
 from database.db import User, add_user
 import os
+from database.db import set_registration_click_status
 
 admin_router = Router()
 
@@ -22,14 +23,14 @@ async def accepting_registration(call : CallbackQuery):
     
 @admin_router.callback_query(F.data.contains("admin_decline"))
 async def declining_registration(call : CallbackQuery):
+    data = call.data.split()
     try:
-        data = call.data.split()
         user_id, name, surname = data[:-1]
+        user_id = int(user_id)
         await call.bot.edit_message_caption(message_id=call.message.message_id, chat_id=call.message.chat.id, caption="Заявка отклонена", reply_markup=None)
         await call.bot.send_message(user_id, "Ваша заявка на регистрацию отклонена!", reply_markup=get_start_kb())
     except:
-        data = call.data.split()
-        user_id = data[0]
+        user_id = int(data[0])
         await call.bot.edit_message_caption(message_id=call.message.message_id, chat_id=call.message.chat.id, caption="Заявка отклонена", reply_markup=None)
         await call.bot.send_message(user_id, "Неправильный формат!!!", reply_markup=get_start_kb())
-    
+    set_registration_click_status(user_id)

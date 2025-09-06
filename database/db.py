@@ -36,3 +36,29 @@ def is_registered(user_id) -> User | None:
     if user is not None:
         return User(user_id = user[1], name = user[2], surname = user[3], wallet=user[4], label=user[5])
     return None
+
+
+def add_registration_click(user_id: int):
+    conn = get_connection()
+    cursor = conn.cursor()
+    cursor.execute("INSERT INTO registration (user_id, is_registered) VALUES (?, ?)",
+                   (user_id, True, ))
+    conn.commit()
+    conn.close()
+
+
+def registration_clicked(user_id: int) -> bool:
+    conn = get_connection()
+    cursor = conn.cursor()
+    user = cursor.execute("SELECT * FROM registration WHERE user_id == ?", (user_id,)).fetchone()
+    if not user or not user[1]:
+        return False
+    return True
+
+
+def set_registration_click_status(user_id: int):
+    conn = get_connection()
+    cursor = conn.cursor()
+    cursor.execute("UPDATE registration SET is_registered = NOT(SELECT is_registered FROM registration WHERE user_id == ?) WHERE user_id == ?", (user_id, user_id))
+    conn.commit()
+    conn.close()
