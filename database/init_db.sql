@@ -14,3 +14,8 @@ CREATE TABLE IF NOT EXISTS laundry (
     end_time TEXT,
     FOREIGN KEY(user_id) REFERENCES users(user_id)
 );
+
+CREATE TABLE IF NOT EXISTS registration (
+    user_id INTEGER PRIMARY KEY,
+    is_registered BOOLEAN
+)
