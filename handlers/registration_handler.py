@@ -3,7 +3,7 @@ from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
 from aiogram.types import CallbackQuery, Message, FSInputFile
 from aiogram.enums.content_type import ContentType
-from keyboards.keyboards import get_cancel_kb, get_admin_kb
+from keyboards.keyboards import get_cancel_kb, get_accept_registration_admin_kb
 import tempfile, os
 from config import ADMIN_CHAT_ID
 from database.db import registration_clicked, add_registration_click
@@ -63,7 +63,7 @@ async def send_to_admin(message: Message, data: dict):
         ADMIN_CHAT_ID,
         FSInputFile(path),
         caption=f'Пользователь: {data["name"]} {data["surname"]}',
-        reply_markup=get_admin_kb(message.chat.id, data["name"], data["surname"])
+        reply_markup=get_accept_registration_admin_kb(message.chat.id, data["name"], data["surname"])
     )
     add_registration_click(message.from_user.id)
     try:

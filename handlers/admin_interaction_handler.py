@@ -10,7 +10,7 @@ from database.db import set_registration_click_status
 
 admin_router = Router()
 
-@admin_router.callback_query(F.data.contains("admin_accept"))
+@admin_router.callback_query(F.data.contains("registration_admin_accept"))
 async def accepting_registration(call : CallbackQuery):
     data = call.data.split()
     user_id = data[0]
@@ -21,7 +21,7 @@ async def accepting_registration(call : CallbackQuery):
     await call.bot.edit_message_caption(message_id=call.message.message_id, chat_id=call.message.chat.id, caption="Заявка одобрена", reply_markup=None)
     await call.bot.send_photo(user_id, photo=FSInputFile("falt.jpg"), caption="Вы были успешно зарегистрированы!", reply_markup=get_start_kb())
     
-@admin_router.callback_query(F.data.contains("admin_decline"))
+@admin_router.callback_query(F.data.contains("registration_admin_decline"))
 async def declining_registration(call : CallbackQuery):
     data = call.data.split()
     try:
