@@ -34,3 +34,20 @@ async def declining_registration(call : CallbackQuery):
         await call.bot.edit_message_caption(message_id=call.message.message_id, chat_id=call.message.chat.id, caption="Заявка отклонена", reply_markup=None)
         await call.bot.send_message(user_id, "Неправильный формат!!!", reply_markup=get_start_kb())
     set_registration_click_status(user_id)
+
+
+@admin_router.callback_query(F.data.contains("studyroom_record_admin_decline"))
+async def declining_registration(call : CallbackQuery):
+    user_id = int(call.data.split()[0])
+    await call.bot.edit_message_text(message_id=call.message.message_id, chat_id=call.message.chat.id, text=f"{call.message.text}\n\nЗаявка отклонена", reply_markup=None)
+    await call.bot.send_photo(user_id, photo=FSInputFile("falt.jpg"), caption="Ваша заявка на бронирование боталки отклонена!", reply_markup=get_start_kb())
+
+
+
+@admin_router.callback_query(F.data.contains("studyroom_record_admin_accept"))
+async def declining_registration(call : CallbackQuery):
+    user_id = int(call.data.split()[0])
+    await call.bot.edit_message_text(message_id=call.message.message_id, chat_id=call.message.chat.id, text=f"{call.message.html_text}\n\nЗаявка одобрена", reply_markup=None, parse_mode="html")
+    await call.bot.send_photo(user_id, photo=FSInputFile("falt.jpg"), caption="Ваша заявка на бронирование боталки принята!", reply_markup=get_start_kb())
+
+    # TODO: сделать генерацию файла
