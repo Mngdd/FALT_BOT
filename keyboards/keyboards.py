@@ -33,3 +33,12 @@ def get_accept_registration_admin_kb(user_id, name, surname) -> InlineKeyboardMa
     ]
     
     return InlineKeyboardMarkup(inline_keyboard=inline_kb_list)
+
+
+def get_accept_studyroom_record_admin_kb(user_id) -> InlineKeyboardMarkup:
+    inline_kb_list = [
+        [InlineKeyboardButton(text="Подтвердить", callback_data=f"{user_id} studyroom_record_admin_accept")],
+        [InlineKeyboardButton(text="Отклонить", callback_data=f"{user_id} studyroom_record_admin_decline")]
+    ]
+
+    return InlineKeyboardMarkup(inline_keyboard=inline_kb_list)
