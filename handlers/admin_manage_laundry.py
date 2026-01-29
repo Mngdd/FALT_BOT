@@ -13,7 +13,7 @@ manage_laundry_router = Router()
 @manage_laundry_router.message(Command("manage_laundry"))
 async def manage_laundry(message: Message):
     if str(message.chat.id) == ADMIN_CHAT_ID:
-        await message.answer("Выберите машину:", reply_markup=get_machines_kb())
+        await message.answer("Выберите машинку:", reply_markup=get_machines_kb())
 
 
 @manage_laundry_router.callback_query(F.data == "exit_from_manage_machines")
@@ -21,7 +21,7 @@ async def exit_from_manage_machines(cb: CallbackQuery):
     await cb.message.delete()
 
 
-@manage_laundry_router.callback_query(F.data.contains("machine_settings"))
+@manage_laundry_router.callback_query(F.data.startswith('machine_settings'))
 async def machine_settings(cb: CallbackQuery):
     machine_name = cb.data.split(maxsplit=1)[1]
     await cb.message.edit_text(text=f"<i>Машинка</i>: <strong>{machine_name}</strong>\n"
@@ -38,3 +38,8 @@ async def change_machine_status(cb: CallbackQuery):
     await cb.message.edit_text(text=f"Статус машинки <strong>{machine_name}</strong> изменен на <strong>'{'Работает' if get_machine_status(machine_name) else 'Не работает'}'</strong>",
                                parse_mode="html"
                                )
+
+
+@manage_laundry_router.callback_query(F.data == "exit_from_machine_settings")
+async def exit_from_machine_settings(cb: CallbackQuery):
+    await cb.message.edit_text(text="Выберите машинку:", reply_markup=get_machines_kb())

@@ -10,8 +10,6 @@ def get_machines_kb() -> InlineKeyboardMarkup:
 
 
 def get_actions_with_machines_kb(machine_name: str) -> InlineKeyboardMarkup:
-    return InlineKeyboardMarkup(
-        inline_keyboard=[
-            [InlineKeyboardButton(text="Изменить статус", callback_data=f"change_machine_status {machine_name}")]
-        ]
-    )
+    btns = [[InlineKeyboardButton(text="Изменить статус", callback_data=f"change_machine_status {machine_name}")],
+            [InlineKeyboardButton(text="Назад", callback_data=f"exit_from_machine_settings")]]
+    return InlineKeyboardMarkup(inline_keyboard=btns)
