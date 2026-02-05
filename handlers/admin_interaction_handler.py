@@ -55,5 +55,9 @@ async def declining_registration(call : CallbackQuery):
     try:
         path = await generate_file(call.message.text)
         await call.bot.send_document(user_id, document=FSInputFile(path), caption="Распечатайте данный файл и повесьте на дверь боталки, чтобы остальные знали, что она забронирована. Лучше сделать это заранее")
+        try:
+            os.remove(path)
+        except OSError:
+            pass
     except Exception:
         pass
