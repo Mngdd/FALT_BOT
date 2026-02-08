@@ -1,6 +1,8 @@
+import re
+
 from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton, WebAppInfo
 from aiogram.utils.keyboard import InlineKeyboardBuilder
-from database.db import is_registered
+from database.db import get_machine_names, get_machine_status
 from datetime import datetime, timedelta
 from services.laundry.schedule import Schedule
 
@@ -16,11 +18,13 @@ def record_set_day_kb(date) -> InlineKeyboardMarkup:
 
 def record_set_machine_kb() -> InlineKeyboardMarkup:
     inline_kb_list = []
-    for i in range(1, 7):
-        if i in [4, 1]:
-            inline_kb_list.append([InlineKeyboardButton(text = "На тех.обслуживании (Запись не доступна)", callback_data=f"broken")])
+    for name in get_machine_names():
+        match = re.search(r"\d+", name)
+        machine_id = match.group(0) if match else name
+        if get_machine_status(name):
+            inline_kb_list.append([InlineKeyboardButton(text=name, callback_data=f"Машинка {machine_id}")])
         else:
-            inline_kb_list.append([InlineKeyboardButton(text = f"#{i}" if i < 6 else f"#6(Сушилка)", callback_data=f"Машинка {i}")])
+            inline_kb_list.append([InlineKeyboardButton(text=f"{name} На тех.обслуживании (Запись недоступна)", callback_data=f"broken")])
     inline_kb_list.append([EXIT_BUTTON])
     return InlineKeyboardMarkup(inline_keyboard=inline_kb_list)
 

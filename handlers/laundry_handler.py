@@ -1,22 +1,29 @@
-from aiogram import Router, F
-from aiogram.fsm.state import State, StatesGroup
-from aiogram.fsm.context import FSMContext
-from aiogram.types import CallbackQuery, Message, FSInputFile
-from aiogram.enums.content_type import ContentType
-from aiogram.types import Message, CallbackQuery, InputMediaPhoto
-from aiogram.utils.keyboard import InlineKeyboardBuilder
-from aiogram.types import InlineKeyboardButton
-from keyboards.laundry_keyboards import record_set_day_kb, record_set_machine_kb, record_set_time_kb, cart_kb
-from keyboards.keyboards import get_cancel_kb, get_start_kb
-from services.laundry.schedule import Schedule
-from services.laundry.plot_schedule import plot_schedule
-from datetime import datetime
-from database.db import is_registered, User
-import random
-import string
+import math
 import os
-from config import LAUNDRY_DATA_PATH as SCHEDULE_PATH
 import tempfile
+from datetime import datetime
+
+from aiogram import Router, F
+from aiogram.enums.content_type import ContentType
+from aiogram.fsm.context import FSMContext
+from aiogram.fsm.state import State, StatesGroup
+from aiogram.types import CallbackQuery, Message, FSInputFile, InputMediaPhoto
+from aiogram.types import InlineKeyboardButton
+from aiogram.utils.keyboard import InlineKeyboardBuilder
+
+from config import (
+    LAUNDRY_DATA_PATH as SCHEDULE_PATH,
+    LAUNDRY_PRICE_PER_HOUR_RUB,
+    LAUNDRY_PRICE_PER_HOUR_WASH_RUB,
+    LAUNDRY_PRICE_PER_HOUR_DRY_RUB,
+)
+from database.db import is_registered
+from keyboards.keyboards import get_cancel_kb, get_start_kb
+from keyboards.laundry_keyboards import record_set_day_kb, record_set_machine_kb, record_set_time_kb, cart_kb
+from keyboards.wallet_keyboards import get_insufficient_funds_kb
+from services.laundry.plot_schedule import plot_schedule
+from services.laundry.schedule import Schedule
+from services.wallet.wallet import get_balance, debit_balance, credit_balance
 
 
 laundry_router = Router()
@@ -31,6 +38,44 @@ class RecordInfo(StatesGroup):
     all_laundries = State()
     original_message = State()
     filepath = State()
+
+
+def _parse_hourly_rate(default_value: str | None) -> int:
+    try:
+        if default_value is None:
+            return int(round(float(LAUNDRY_PRICE_PER_HOUR_RUB)))
+        return int(round(float(default_value)))
+    except (TypeError, ValueError):
+        return 75
+
+
+def _rate_for_machine(machine_id: str) -> int:
+    try:
+        is_dryer = int(machine_id) == 6
+    except ValueError:
+        is_dryer = False
+    if is_dryer:
+        return _parse_hourly_rate(LAUNDRY_PRICE_PER_HOUR_DRY_RUB)
+    return _parse_hourly_rate(LAUNDRY_PRICE_PER_HOUR_WASH_RUB)
+
+
+def _hours_for_interval(begin_time: str, end_time: str) -> int:
+    start = datetime.strptime(begin_time, "%H:%M")
+    end = datetime.strptime(end_time, "%H:%M")
+    minutes = int((end - start).total_seconds() / 60)
+    if minutes <= 0:
+        raise ValueError("Invalid time interval")
+    return math.ceil(minutes / 60)
+
+
+def _calc_total_amount(records: list[tuple[str, str, str]]) -> tuple[int, int]:
+    total_hours = 0
+    total_amount = 0
+    for machine_id, begin_time, end_time in records:
+        hours = _hours_for_interval(begin_time, end_time)
+        total_hours += hours
+        total_amount += hours * _rate_for_machine(machine_id)
+    return int(total_amount), total_hours
 
 @laundry_router.callback_query(lambda callback : callback.data in ["laundry_record","exit_from_record"])
 async def start_record(call : CallbackQuery, state : FSMContext):
@@ -57,8 +102,6 @@ async def set_day(call: CallbackQuery, state: FSMContext):
 @laundry_router.callback_query(F.data.contains("Машинка"))
 async def set_machine(call: CallbackQuery, state: FSMContext):
     machine = call.data.split()[1]
-    if machine in ["4", "1"]:
-        return
     data = await state.update_data(machine=machine)
     try:
         os.remove(data["filepath"])
@@ -67,6 +110,11 @@ async def set_machine(call: CallbackQuery, state: FSMContext):
     schedule = Schedule(SCHEDULE_PATH)
     schedule.load_schedule()
     await call.message.edit_caption(caption=f"Выберите время:", reply_markup=record_set_time_kb(schedule, data["date"], data["machine"]))
+
+
+@laundry_router.callback_query(F.data == "broken")
+async def broken_machine(call: CallbackQuery):
+    await call.answer("Эта машинка на тех.обслуживании. Запись недоступна.", show_alert=True)
 
 @laundry_router.callback_query(F.data.contains("set_time"))
 async def set_time(call : CallbackQuery, state : FSMContext):
@@ -112,11 +160,22 @@ async def laundry_cancel(call: CallbackQuery):
     if not ok:
         await call.message.edit_caption(caption="Не удалось отменить запись (возможно, она уже удалена).", reply_markup=get_start_kb())
         return
+    try:
+        refund_amount = _hours_for_interval(b, e) * _rate_for_machine(machine)
+    except ValueError:
+        refund_amount = 0
+    if refund_amount > 0:
+        credit_balance(call.message.chat.id, refund_amount, "laundry_cancel")
     bookings = schedule.get_user_bookings(str(call.message.chat.id))
     if not bookings:
-        await call.message.edit_caption(caption="Запись отменена. У вас больше нет записей.", reply_markup=get_start_kb())
+        msg = "Запись отменена. У вас больше нет записей."
+        if refund_amount > 0:
+            msg += f"\nВозврат: {refund_amount} ₽"
+        await call.message.edit_caption(caption=msg, reply_markup=get_start_kb())
         return
     text_lines = ["Запись отменена. Ваши актуальные записи:"]
+    if refund_amount > 0:
+        text_lines.append(f"Возврат: {refund_amount} ₽")
     kb = InlineKeyboardBuilder()
     for i, (d, m, bb, ee, label) in enumerate(bookings, 1):
         text_lines.append(f"{i}. {d} • Машинка {m} • {bb}-{ee}")
@@ -152,16 +211,63 @@ async def cart_view(message : Message, state : FSMContext):
     msg_text = "Итого:\n"
     for record in data["all_laundries"]:
         msg_text += f"- Машинка {record[0]}: {record[1]}-{record[2]}\n"
+    amount_rub, total_hours = _calc_total_amount(data["all_laundries"])
+    msg_text += f"\nСтоимость: {amount_rub} ₽ ({total_hours} ч.)"
     await message.edit_caption(caption = msg_text, reply_markup=cart_kb(data["date"]))
     
 @laundry_router.callback_query(F.data == "laundry_pay")
 async def laundry_pay(call : CallbackQuery, state : FSMContext):
     data = await state.get_data()
-    user = is_registered(call.message.chat.id)
+    records = data.get("all_laundries") or []
+    if not records:
+        await call.answer("Нет выбранных бронирований для оплаты.", show_alert=True)
+        return
+
+    amount_rub, total_hours = _calc_total_amount(records)
+    balance = get_balance(call.message.chat.id)
+    if balance < amount_rub:
+        await call.message.edit_media(
+            InputMediaPhoto(
+                media=FSInputFile("falt.jpg"),
+                caption=f"Недостаточно средств.\nК оплате: {amount_rub} ₽\nБаланс: {balance} ₽",
+            ),
+            reply_markup=get_insufficient_funds_kb(),
+        )
+        return
+
     schedule = Schedule(SCHEDULE_PATH)
     schedule.load_schedule()
-    for record in data["all_laundries"]:
-        schedule.add_booking(data["date"], record[0], record[1], record[2], f"{user.surname} {user.name[0]}.", str(call.message.chat.id))
-    await call.message.edit_media(InputMediaPhoto(media=FSInputFile("falt.jpg"), caption="Оплата проведена успешно!"), reply_markup=get_start_kb())
+    for machine_id, begin_time, end_time in records:
+        if not schedule.is_time_available(data["date"], str(machine_id), begin_time, end_time):
+            await call.message.edit_caption(
+                caption=f"Время {begin_time}-{end_time} на машинку {machine_id} уже занято. Выбери другое.",
+                reply_markup=record_set_time_kb(schedule, data["date"], machine_id),
+            )
+            return
+
+    if not debit_balance(call.message.chat.id, amount_rub, "laundry_booking"):
+        await call.message.edit_media(
+            InputMediaPhoto(
+                media=FSInputFile("falt.jpg"),
+                caption="Недостаточно средств для оплаты.",
+            ),
+            reply_markup=get_insufficient_funds_kb(),
+        )
+        return
+
+    user = is_registered(call.message.chat.id)
+    label = f"{user.surname} {user.name[0]}." if user else "Пользователь"
+    for machine_id, begin_time, end_time in records:
+        schedule.add_booking(data["date"], machine_id, begin_time, end_time, label, str(call.message.chat.id))
+
+    new_balance = get_balance(call.message.chat.id)
+    await state.clear()
+    await call.message.edit_media(
+        InputMediaPhoto(
+            media=FSInputFile("falt.jpg"),
+            caption=f"Бронь подтверждена.\nСписано: {amount_rub} ₽\nБаланс: {new_balance} ₽",
+        ),
+        reply_markup=get_start_kb(),
+    )
 
     
