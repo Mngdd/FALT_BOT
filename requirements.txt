@@ -23,6 +23,7 @@ propcache==0.2.1
 pydantic==2.10.6
 pydantic_core==2.27.2
 pyparsing==3.2.1
+python-crontab==3.3.0
 python-dateutil==2.9.0.post0
 python-dotenv==1.0.1
 six==1.17.0

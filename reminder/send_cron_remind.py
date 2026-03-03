@@ -1,8 +1,13 @@
 import sys
 import asyncio
 from aiogram import Bot
-from config import TOKEN
 from crontab import CronTab
+
+from pathlib import Path
+
+sys.path.append(str(Path(__file__).parent.parent))
+
+from config import TOKEN
 
 
 async def send(chat_id: int, message: str, comment: str):
@@ -19,9 +24,9 @@ async def send(chat_id: int, message: str, comment: str):
     await bot.session.close()
 
 if __name__ == "__main__":
-    if len(sys.argv) != 2:
+    if len(sys.argv) != 4:
         raise RuntimeError(
-            f"Reminder service got unexpected amount of arguments: {len(sys.argv)}! (expected 2)"
+            f"Reminder service got unexpected amount of arguments: {len(sys.argv)}! (expected 4)"
         )
 
     # тут бы ошибки половить, вдруг косо с крона прилетит, но чета лень лол

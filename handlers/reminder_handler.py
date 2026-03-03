@@ -29,7 +29,7 @@ def add_reminders(chat_id: int, event_time: datetime, machine_num: int):
          f"🔔 Напоминаем о стирке в машинке №{machine_num}. До начала 5 минут!"
          ),
         (event_time,
-         f"⏰ Напоминаем, что машинкf №{machine_num} ждет вас!"
+         f"⏰ Напоминаем, что машинка №{machine_num} ждет вас!"
          ),
     ]
 
