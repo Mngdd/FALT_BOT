@@ -25,7 +25,7 @@ from services.laundry.plot_schedule import plot_schedule
 from services.laundry.schedule import Schedule
 from services.wallet.wallet import get_balance, debit_balance, credit_balance
 
-from handlers.reminder_hanlder import add_reminders
+from handlers.reminder_handler import add_reminders
 
 laundry_router = Router()
 
