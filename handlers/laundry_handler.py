@@ -269,7 +269,6 @@ async def laundry_pay(call : CallbackQuery, state : FSMContext):
             f"{begin_time} {data["date"]}",
             "%H:%M %d.%m.%Y"
         )
-        print(" niiggaa:", event_time)
         schedule.add_booking(data["date"], machine_id, begin_time, end_time, label, str(call.message.chat.id))
         add_reminders(call.message.chat.id, event_time, machine_id)
 
