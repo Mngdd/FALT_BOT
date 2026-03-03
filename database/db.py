@@ -9,6 +9,35 @@ class User():
         self.wallet = wallet
         self.label = label
 
+
+class RefundRequest():
+    def __init__(
+        self,
+        request_id,
+        user_id,
+        problem_text,
+        requested_amount,
+        approved_amount,
+        status,
+        admin_comment,
+        admin_id,
+        created_at,
+        updated_at,
+        resolved_at,
+    ):
+        self.request_id = request_id
+        self.user_id = user_id
+        self.problem_text = problem_text
+        self.requested_amount = requested_amount
+        self.approved_amount = approved_amount
+        self.status = status
+        self.admin_comment = admin_comment
+        self.admin_id = admin_id
+        self.created_at = created_at
+        self.updated_at = updated_at
+        self.resolved_at = resolved_at
+
+
 def get_connection():
     return sqlite3.connect(DATABASE_PATH)
 
@@ -36,6 +65,98 @@ def is_registered(user_id) -> User | None:
     if user is not None:
         return User(user_id = user[1], name = user[2], surname = user[3], wallet=user[4], label=user[5])
     return None
+
+
+def _refund_request_from_row(row) -> RefundRequest | None:
+    if row is None:
+        return None
+    return RefundRequest(
+        request_id=row[0],
+        user_id=row[1],
+        problem_text=row[2],
+        requested_amount=row[3],
+        approved_amount=row[4],
+        status=row[5],
+        admin_comment=row[6],
+        admin_id=row[7],
+        created_at=row[8],
+        updated_at=row[9],
+        resolved_at=row[10],
+    )
+
+
+def create_refund_request(user_id: int, problem_text: str, requested_amount: int) -> int:
+    conn = get_connection()
+    cursor = conn.cursor()
+    cursor.execute(
+        """
+        INSERT INTO refund_requests (user_id, problem_text, requested_amount, status)
+        VALUES (?, ?, ?, 'new')
+        """,
+        (int(user_id), str(problem_text), int(requested_amount)),
+    )
+    request_id = cursor.lastrowid
+    conn.commit()
+    conn.close()
+    return request_id
+
+
+def get_refund_request(request_id: int) -> RefundRequest | None:
+    conn = get_connection()
+    cursor = conn.cursor()
+    cursor.execute("SELECT * FROM refund_requests WHERE id = ? LIMIT 1", (int(request_id),))
+    row = cursor.fetchone()
+    conn.close()
+    return _refund_request_from_row(row)
+
+
+def resolve_refund_request(
+    request_id: int,
+    status: str,
+    admin_id: int,
+    approved_amount: int | None = None,
+    admin_comment: str | None = None,
+) -> bool:
+    conn = get_connection()
+    cursor = conn.cursor()
+    cursor.execute(
+        """
+        UPDATE refund_requests
+        SET
+            status = ?,
+            approved_amount = ?,
+            admin_comment = ?,
+            admin_id = ?,
+            updated_at = CURRENT_TIMESTAMP,
+            resolved_at = CURRENT_TIMESTAMP
+        WHERE id = ? AND status = 'new'
+        """,
+        (status, approved_amount, admin_comment, int(admin_id), int(request_id)),
+    )
+    is_updated = cursor.rowcount > 0
+    conn.commit()
+    conn.close()
+    return is_updated
+
+
+def add_refund_log(
+    request_id: int,
+    action: str,
+    actor_id: int | None = None,
+    comment: str | None = None,
+    amount: int | None = None,
+):
+    conn = get_connection()
+    cursor = conn.cursor()
+    cursor.execute(
+        """
+        INSERT INTO refund_logs (request_id, action, actor_id, comment, amount)
+        VALUES (?, ?, ?, ?, ?)
+        """,
+        (int(request_id), action, actor_id, comment, amount),
+    )
+    conn.commit()
+    conn.close()
 
 
 def get_machine_names() -> list[str]:

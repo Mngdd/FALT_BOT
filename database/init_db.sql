@@ -55,4 +55,29 @@ CREATE TABLE IF NOT EXISTS wallet_transactions (
 CREATE TABLE IF NOT EXISTS registration (
     user_id INTEGER PRIMARY KEY,
     is_registered BOOLEAN
-)
+);
+
+CREATE TABLE IF NOT EXISTS refund_requests (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER NOT NULL,
+    problem_text TEXT NOT NULL,
+    requested_amount INTEGER NOT NULL,
+    approved_amount INTEGER,
+    status TEXT NOT NULL DEFAULT 'new',
+    admin_comment TEXT,
+    admin_id INTEGER,
+    created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    resolved_at TEXT
+);
+
+CREATE TABLE IF NOT EXISTS refund_logs (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    request_id INTEGER NOT NULL,
+    action TEXT NOT NULL,
+    actor_id INTEGER,
+    comment TEXT,
+    amount INTEGER,
+    created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY(request_id) REFERENCES refund_requests(id)
+);
