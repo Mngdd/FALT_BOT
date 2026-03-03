@@ -25,6 +25,7 @@ from services.laundry.plot_schedule import plot_schedule
 from services.laundry.schedule import Schedule
 from services.wallet.wallet import get_balance, debit_balance, credit_balance
 
+from handlers.reminder_hanlder import add_reminders
 
 laundry_router = Router()
 
@@ -89,7 +90,7 @@ async def start_record(call : CallbackQuery, state : FSMContext):
     await state.update_data(all_laundries = [])
     await state.set_state(RecordInfo.date)
 
-    
+
 @laundry_router.callback_query(F.data.contains("record_date"))
 async def set_day(call: CallbackQuery, state: FSMContext):
     date = call.data.split()[1]
@@ -220,7 +221,7 @@ async def cart_view(message : Message, state : FSMContext):
     amount_rub, total_hours = _calc_total_amount(data["all_laundries"])
     msg_text += f"\nСтоимость: {amount_rub} ₽ ({total_hours:.2f} ч.)"
     await message.edit_caption(caption = msg_text, reply_markup=cart_kb(data["date"]))
-    
+
 @laundry_router.callback_query(F.data == "laundry_pay")
 async def laundry_pay(call : CallbackQuery, state : FSMContext):
     data = await state.get_data()
@@ -264,7 +265,13 @@ async def laundry_pay(call : CallbackQuery, state : FSMContext):
     user = is_registered(call.message.chat.id)
     label = f"{user.surname} {user.name[0]}." if user else "Пользователь"
     for machine_id, begin_time, end_time in records:
+        event_time = event_time = datetime.strptime(
+            f"{begin_time} {data["date"]}",
+            "%H:%M %d.%m.%Y"
+        )
+        print(" niiggaa:", event_time)
         schedule.add_booking(data["date"], machine_id, begin_time, end_time, label, str(call.message.chat.id))
+        add_reminders(call.message.chat.id, event_time, machine_id)
 
     new_balance = get_balance(call.message.chat.id)
     await state.clear()
@@ -275,5 +282,3 @@ async def laundry_pay(call : CallbackQuery, state : FSMContext):
         ),
         reply_markup=get_start_kb(),
     )
-
-    
