@@ -2,7 +2,10 @@ from crontab import CronTab
 from datetime import datetime, timedelta
 import sys
 from pathlib import Path
+import json
+sys.path.append(str(Path(__file__).parent.parent))
 
+from config import LAUNDRY_DATA_PATH, DB_PATH
 
 # TODO: в идеале бы сделать ремайндеры настраиваемыми
 # аля типа напомните мне за 5 минут до и после начала стирки
@@ -53,3 +56,44 @@ def add_reminders(chat_id: int, event_time: datetime, machine_num: int):
         )
 
     cron.write()
+
+#гавнакод чтоб всем поставить уведы
+def add_remind_to_all():
+    def find_user_id(initials: str):
+        # "marathon j." -> имя "marathon", инициал "j"
+        parts = initials.strip().rstrip(".").split()
+        if len(parts) < 2:
+            return None
+
+        surname = parts[0]
+        name_initial = parts[1].rstrip(".")
+
+        with sqlite3.connect(DB_PATH) as conn:
+            cursor = conn.cursor()
+            cursor.execute("""
+                SELECT user_id FROM users
+                WHERE LOWER(surname) = LOWER(?)
+                AND LOWER(SUBSTR(name, 1, 1)) = LOWER(?)
+                LIMIT 1
+            """, (surname, name_initial))
+            row = cursor.fetchone()
+            return row[0] if row else None
+
+    with open(LAUNDRY_DATA_PATH, mode="r") as f:
+        data = json.load(f)
+
+    now = datetime.now() + timedelta(minutes=20)
+    for date_str, numbers in data.items():
+        for num, events in numbers.items():
+            for event in events:
+                event_time = datetime.strptime(f"{event[0]} {date_str}", "%H:%M %d.%m.%Y")
+                if event_time > now:
+                    user_id = find_user_id(event[2])
+                    if user_id is not None:
+                        print(f"уведомляем: дата [{event_time}]; машинка {num}; объект {event}; user_id: {user_id}")
+                        add_reminders(user_id, event_time, num)
+
+
+
+if __name__ == "__main__":
+    add_remind_to_all()
